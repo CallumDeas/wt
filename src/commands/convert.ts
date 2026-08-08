@@ -211,6 +211,12 @@ export function registerConvert(program: Command): void {
                         if (copied.length > 0) {
                             output.success(`Preserved ${copied.length} untracked file(s) → ${defBranch}/`);
                             for (const f of copied) output.dim(`  ${f}`);
+                        } else {
+                            // The banner above promises untracked files are carried over, so
+                            // never let a total failure pass in silence.
+                            output.warn(
+                                `Found ${untrackedFiles.length} untracked file(s) but copied none — check ${defBranch}/ for .env files.`,
+                            );
                         }
                     }
 

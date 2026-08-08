@@ -88,6 +88,29 @@ describe("collectUntrackedFiles", () => {
         const files = collectUntrackedFiles(repoDir);
         expect(files).toHaveLength(0);
     });
+
+    // Regression: a real monorepo's ignored listing runs to megabytes, which
+    // overflowed spawnSync's 1MB default maxBuffer. git was killed, stdout came
+    // back truncated with a null status, and the whole ignored list — every
+    // .env — was dropped as if the repo were clean.
+    it("still returns ignored files when the listing exceeds 1MB", () => {
+        writeFileSync(join(repoDir, ".gitignore"), ".env\nbulk/\n");
+        git(["add", ".gitignore"], repoDir);
+        git(["commit", "-m", "add gitignore"], repoDir);
+        writeFileSync(join(repoDir, ".env"), "SECRET=abc\n");
+
+        // Long paths keep the listing above 1MB without the inode churn of tens
+        // of thousands of files. The length lives in a nested directory rather
+        // than the filename, which caps at 255 bytes on macOS.
+        const bulkDir = join(repoDir, "bulk", "d".repeat(200));
+        mkdirSync(bulkDir, { recursive: true });
+        for (let i = 0; i < 5000; i++) {
+            writeFileSync(join(bulkDir, `f-${i}`), "");
+        }
+
+        const files = collectUntrackedFiles(repoDir);
+        expect(files).toContain(".env");
+    });
 });
 
 describe("copyUntrackedFiles", () => {
